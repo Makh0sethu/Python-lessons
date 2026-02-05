@@ -3,29 +3,56 @@
 #
 # <---- Set your 'OPENAI_API_KEY' as a secret over there with the "key" icon
 #
+import os
 import json
 import functions as fn#importing functions from functions.py, you can also just copy paste the functions in this file if you want to avoid imports for now.
 import variables as var #importing variables from variables.py, you can also just copy paste the variables in this file if you want to avoid imports for now.
 
 
-user_input= var.user_input 
-var.memory.append({"role":"user", "content":user_input})
-
 max_iterations = 5
 iteration=0
+memory = var.memory
+
  #The Agent Loop
 while iteration < max_iterations:
  try:
-    # 1. Construct prompt: Combine agent rules with memory
-    prompt = var.agent_rules + var.memory
+
+    if response.choices[0].message.message.toll_calls:
+        tool=var.tool
+        tool_name = var.tool_name
+        tool_args = var.tool_args
 
     # 2. Generate response from LLM
-    print("Agent thinking...")
+        if tool_name == "terminate":
+            print(f"Termination message: {tool_args['message']}")
+        elif tool_name in var.function_registry:
+            try:
+                result = var.result
+            except Exception as e:
+                result = {"error":f"Error executing {tool_name}: {str(e)}"}
+        else:
+            result = {"error": f"Unknown tool: {tool_name}"}
+
+        print ("executing tool:", tool_name + " with arguments: " + str(tool_args))
+        print ("Result:", result)
+        memory.extend([
+            {"role": "assistant", "content": json.dumps(var.action)},
+            {"role": "user", "content": json.dumps(result)}
+        ])
+    else :
+        result = response.choices[0].message.content
+        print (f"Response: {result}")
+        break
+
+
+
+
+
     response = fn.generate_response(prompt)
     print(f"Agent response: {response}")
 
     # 3. Parse response to determine action
-    action = fn.parse_action(response)
+    '''action = fn.parse_action(response)'''
     result = "Action executed"
 
     if action["tool_name"] == "list_files":
