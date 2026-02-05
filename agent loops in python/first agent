@@ -1,0 +1,79 @@
+
+# Important!!!
+#
+# <---- Set your 'OPENAI_API_KEY' as a secret over there with the "key" icon
+#
+import json
+import functions as fn#importing functions from functions.py, you can also just copy paste the functions in this file if you want to avoid imports for now.
+import variables as var #importing variables from variables.py, you can also just copy paste the variables in this file if you want to avoid imports for now.
+
+
+user_input= var.user_input 
+var.memory.append({"role":"user", "content":user_input})
+
+max_iterations = 5
+iteration=0
+ #The Agent Loop
+while iteration < max_iterations:
+ try:
+    # 1. Construct prompt: Combine agent rules with memory
+    prompt = var.agent_rules + var.memory
+
+    # 2. Generate response from LLM
+    print("Agent thinking...")
+    response = fn.generate_response(prompt)
+    print(f"Agent response: {response}")
+
+    # 3. Parse response to determine action
+    action = fn.parse_action(response)
+    result = "Action executed"
+
+    if action["tool_name"] == "list_files":
+        try :
+            result = {"result":fn.list_files()}
+        except Exception as e:
+            result = {"error":str(e)}
+
+    elif action["tool_name"] == "read_file":
+        try :
+            if "file_name" not in action["args"]:
+                result = {"error":"Missing 'file_name' argument for read_file."}
+            else:
+                result = {"result":fn.read_file(action["args"]["file_name"])}
+        except Exception as e:
+            result = {"error":str(e)}
+
+    elif action["tool_name"] == "error":
+        result = {"error":action["args"]["message"]}
+
+    elif action["tool_name"] == "terminate":
+        print(action["args"]["message"])
+        break
+    else:
+        result = {"error":"Unknown action: "+action["tool_name"]}
+
+    print(f"Action result: {result}")
+
+    # 5. Update memory with response and results
+    var.memory.extend([
+        {"role": "assistant", "content": response},
+        {"role": "user", "content": json.dumps(result)}
+    ])
+
+    # 6. Check termination condition
+    if action["tool_name"] == "terminate":
+        break
+
+    iteration += 1
+ except Exception as e:
+    print(f"Error in agent loop: {str(e)}")
+    
+    var.memory.append({
+        "role": "user",
+        "content": json.dumps({f"system error: {str(e)}"})
+    })
+
+    iteration += 1
+
+if iteration >= max_iterations:
+    print("You have reached your limit, please start a new session.")
